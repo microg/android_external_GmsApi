@@ -19,7 +19,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:2.2.3'
+        classpath 'com.android.tools.build:gradle:2.3.1'
         classpath 'com.github.dcendents:android-maven-gradle-plugin:1.5'
     }
 }
@@ -31,7 +31,7 @@ allprojects {
 
 def androidCompileSdk() { return 25 }
 
-def androidTargetSdk() { return 23 }
+def androidTargetSdk() { return 24 }
 
 def androidMinSdk() { return 9 }
 

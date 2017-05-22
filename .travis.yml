@@ -1,14 +1,13 @@
 language: android
-sudo: false
 git:
   submodules: false
 before_install:
   - git submodule update --init --recursive
 script:
-  - jdk_switcher use oraclejdk8
-  - echo sdk.dir $ANDROID_HOME > local.properties
-  - export TERM=dumb
   - export JAVA_OPTS="-XX:+CMSClassUnloadingEnabled -XX:+HeapDumpOnOutOfMemoryError -Xmx2048m"
+  - export TERM=dumb
+  - echo sdk.dir $ANDROID_HOME > local.properties
+  - jdk_switcher use oraclejdk8
   - ./gradlew assemble
 android:
   components:
