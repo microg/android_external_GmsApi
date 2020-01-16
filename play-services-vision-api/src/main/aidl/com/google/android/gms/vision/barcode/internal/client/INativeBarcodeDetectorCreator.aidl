@@ -1,4 +1,3 @@
-// INativeBarcodeDetectorCreator.aidl
 package com.google.android.gms.vision.barcode.internal.client;
 
 import com.google.android.gms.vision.barcode.internal.client.BarcodeDetectorOptions;

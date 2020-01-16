@@ -3,6 +3,7 @@ package com.google.android.gms.vision.barcode.internal.client;
 import android.os.RemoteException;
 import android.util.Log;
 
+import com.google.android.gms.vision.barcode.internal.client.INativeBarcodeDetector;
 import com.google.android.gms.dynamic.IObjectWrapper;
 
 public class BarcodeDetector extends INativeBarcodeDetector.Stub {
