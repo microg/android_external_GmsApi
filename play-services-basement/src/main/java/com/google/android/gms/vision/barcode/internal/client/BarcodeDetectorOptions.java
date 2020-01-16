@@ -5,9 +5,9 @@ import org.microg.safeparcel.SafeParceled;
 
 public class BarcodeDetectorOptions extends AutoSafeParcelable {
     @SafeParceled(1)
-    private int versionCode = 1;
+    public int versionCode = 1;
     @SafeParceled(2)
-    private int options;
+    public int formats;
 
     public static Creator<BarcodeDetectorOptions> CREATOR = new AutoCreator<BarcodeDetectorOptions>(BarcodeDetectorOptions.class);
 
