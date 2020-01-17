@@ -1,13 +1,22 @@
 package com.google.android.gms.vision.barcode.internal.client;
 
+import android.graphics.Bitmap;
 import android.os.RemoteException;
 import android.util.Log;
-import android.graphics.Bitmap;
 
-import com.google.zxing.qrcode.QRCodeReader;
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 
-import com.google.android.gms.dynamic.ObjectWrapper;
 import com.google.android.gms.dynamic.IObjectWrapper;
+import com.google.android.gms.dynamic.ObjectWrapper;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.ChecksumException;
+import com.google.zxing.FormatException;
+import com.google.zxing.NotFoundException;
+import com.google.zxing.Result;
+import com.google.zxing.common.HybridBinarizer;
+import com.google.zxing.qrcode.QRCodeReader;
+import com.google.zxing.RGBLuminanceSource;
 
 public class BarcodeDetector extends INativeBarcodeDetector.Stub {
     // TODO: Can we force these to be a bitfield somehow?
@@ -36,6 +45,25 @@ public class BarcodeDetector extends INativeBarcodeDetector.Stub {
         if (bitmap == null) {
             Log.e("barcoder", "Could not unwrap Bitmap");
             return;
+        }
+
+        IntBuffer frameBuf = IntBuffer.allocate(bitmap.getByteCount());
+        bitmap.copyPixelsToBuffer(frameBuf);
+        int[] frameBytes = frameBuf.array();
+
+        RGBLuminanceSource source = new RGBLuminanceSource(bitmap.getHeight(), bitmap.getWidth(), frameBytes);
+        HybridBinarizer binarizer = new HybridBinarizer(source);
+        BinaryBitmap binaryBitmap = new BinaryBitmap(binarizer);
+        QRCodeReader reader = new QRCodeReader();
+        try {
+            Result result = reader.decode(binaryBitmap);
+            Log.d("barcoder" , "Found: " + result.getText());
+        } catch (FormatException e) {
+            e.printStackTrace();
+        } catch (ChecksumException e) {
+            e.printStackTrace();
+        } catch (NotFoundException e) {
+            e.printStackTrace();
         }
         // TODO: remove
         Log.d("barcoder", "Unknown 1 called");
