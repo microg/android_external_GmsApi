@@ -2,8 +2,11 @@ package com.google.android.gms.vision.barcode.internal.client;
 
 import android.os.RemoteException;
 import android.util.Log;
+import android.graphics.Bitmap;
 
-import com.google.android.gms.vision.barcode.internal.client.INativeBarcodeDetector;
+import com.google.zxing.qrcode.QRCodeReader;
+
+import com.google.android.gms.dynamic.ObjectWrapper;
 import com.google.android.gms.dynamic.IObjectWrapper;
 
 public class BarcodeDetector extends INativeBarcodeDetector.Stub {
@@ -28,8 +31,15 @@ public class BarcodeDetector extends INativeBarcodeDetector.Stub {
     }
 
     @Override
-    public void unk1(IObjectWrapper unk1, FrameMetadata metadata) throws RemoteException {
+    public void detect(IObjectWrapper wrappedBitmap, FrameMetadata metadata) throws RemoteException {
+        Bitmap bitmap = ObjectWrapper.unwrapTyped(wrappedBitmap, Bitmap.class);
+        if (bitmap == null) {
+            Log.e("barcoder", "Could not unwrap Bitmap");
+            return;
+        }
+        // TODO: remove
         Log.d("barcoder", "Unknown 1 called");
+
     }
 
     @Override
