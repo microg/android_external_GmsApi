@@ -6,6 +6,8 @@ import android.util.Log;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.google.android.gms.dynamic.IObjectWrapper;
 import com.google.android.gms.dynamic.ObjectWrapper;
@@ -13,12 +15,26 @@ import com.google.zxing.BinaryBitmap;
 import com.google.zxing.ChecksumException;
 import com.google.zxing.FormatException;
 import com.google.zxing.NotFoundException;
+import com.google.zxing.Reader;
 import com.google.zxing.Result;
 import com.google.zxing.common.HybridBinarizer;
+import com.google.zxing.datamatrix.DataMatrixReader;
+import com.google.zxing.oned.CodaBarReader;
+import com.google.zxing.oned.Code128Reader;
+import com.google.zxing.oned.Code39Reader;
+import com.google.zxing.oned.Code93Reader;
+import com.google.zxing.oned.EAN13Reader;
+import com.google.zxing.oned.EAN8Reader;
+import com.google.zxing.oned.ITFReader;
+import com.google.zxing.oned.UPCAReader;
+import com.google.zxing.oned.UPCEReader;
+import com.google.zxing.pdf417.PDF417Reader;
 import com.google.zxing.qrcode.QRCodeReader;
 import com.google.zxing.RGBLuminanceSource;
 
 public class BarcodeDetector extends INativeBarcodeDetector.Stub {
+    public static final String TAG = BarcodeDetector.class.getSimpleName();
+
     // TODO: Can we force these to be a bitfield somehow?
     public static final int CODE_128 = 1;
     public static final int CODE_39 = 2;
@@ -40,11 +56,11 @@ public class BarcodeDetector extends INativeBarcodeDetector.Stub {
     }
 
     @Override
-    public void detect(IObjectWrapper wrappedBitmap, FrameMetadata metadata) throws RemoteException {
+    public Barcode[] detect(IObjectWrapper wrappedBitmap, FrameMetadata metadata) throws RemoteException {
         Bitmap bitmap = ObjectWrapper.unwrapTyped(wrappedBitmap, Bitmap.class);
         if (bitmap == null) {
             Log.e("barcoder", "Could not unwrap Bitmap");
-            return;
+            return null;
         }
 
         IntBuffer frameBuf = IntBuffer.allocate(bitmap.getByteCount());
@@ -54,24 +70,66 @@ public class BarcodeDetector extends INativeBarcodeDetector.Stub {
         RGBLuminanceSource source = new RGBLuminanceSource(bitmap.getHeight(), bitmap.getWidth(), frameBytes);
         HybridBinarizer binarizer = new HybridBinarizer(source);
         BinaryBitmap binaryBitmap = new BinaryBitmap(binarizer);
-        QRCodeReader reader = new QRCodeReader();
-        try {
-            Result result = reader.decode(binaryBitmap);
-            Log.d("barcoder" , "Found: " + result.getText());
-        } catch (FormatException e) {
-            e.printStackTrace();
-        } catch (ChecksumException e) {
-            e.printStackTrace();
-        } catch (NotFoundException e) {
-            e.printStackTrace();
-        }
-        // TODO: remove
-        Log.d("barcoder", "Unknown 1 called");
+        List<Barcode> barcodes = new ArrayList<>();
 
+        if ((this.formats & CODE_128) != 0) {
+            tryDetect(new Code128Reader(), binaryBitmap, barcodes);
+        }
+        if ((this.formats & CODE_39) != 0) {
+            tryDetect(new Code39Reader(), binaryBitmap, barcodes);
+        }
+        if ((this.formats & CODE_93) != 0) {
+            tryDetect(new Code93Reader(), binaryBitmap, barcodes);
+        }
+        if ((this.formats & CODABAR) != 0) {
+            tryDetect(new CodaBarReader(), binaryBitmap, barcodes);
+        }
+        if ((this.formats & DATA_MATRIX) != 0) {
+            tryDetect(new DataMatrixReader(), binaryBitmap, barcodes);
+        }
+        if ((this.formats & EAN_13) != 0) {
+            tryDetect(new EAN13Reader(), binaryBitmap, barcodes);
+        }
+        if ((this.formats & EAN_8) != 0) {
+            tryDetect(new EAN8Reader(), binaryBitmap, barcodes);
+        }
+        if ((this.formats & ITF) != 0) {
+            tryDetect(new ITFReader(), binaryBitmap, barcodes);
+        }
+        if ((this.formats & QR_CODE) != 0) {
+            tryDetect(new QRCodeReader(), binaryBitmap, barcodes);
+        }
+        if ((this.formats & UPC_A) != 0) {
+            tryDetect(new UPCAReader(), binaryBitmap, barcodes);
+        }
+        if ((this.formats & UPC_E) != 0) {
+            tryDetect(new UPCEReader(), binaryBitmap, barcodes);
+        }
+        if ((this.formats & PDF417) != 0) {
+            tryDetect(new PDF417Reader(), binaryBitmap, barcodes);
+        }
+
+        return barcodes.toArray(new Barcode[0]);
     }
 
     @Override
     public void unk2(IObjectWrapper unk1, FrameMetadata metadata) throws RemoteException {
         Log.d("barcoder", "Unknown 2 called");
+    }
+
+    private void tryDetect(Reader reader, BinaryBitmap bitmap, List<Barcode> results) {
+        try {
+            Result result = reader.decode(bitmap);
+            if (result.getText() != null) {
+                results.add(new Barcode(result.getText()));
+            }
+        } catch (FormatException e) {
+            // TODO: Log this in some other way?
+            e.printStackTrace();
+        } catch (ChecksumException e) {
+            e.printStackTrace();
+        } catch (NotFoundException e) {
+            Log.d(TAG, "No barcode found when detecting with " + reader.getClass().getName());
+        }
     }
 }

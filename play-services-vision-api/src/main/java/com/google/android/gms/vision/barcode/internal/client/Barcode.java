@@ -1,13 +1,39 @@
 package com.google.android.gms.vision.barcode.internal.client;
 
 import android.graphics.Point;
+import android.support.annotation.IntRange;
+import android.support.annotation.RestrictTo;
+import android.util.Log;
+import android.util.Patterns;
 
 import org.microg.safeparcel.AutoSafeParcelable;
 import org.microg.safeparcel.SafeParceled;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLDecoder;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 public class Barcode extends AutoSafeParcelable {
+    public static final String TAG = Barcode.class.getSimpleName();
+
+    public static final int CONTACT_INFO = 1;
+    public static final int EMAIL = 2;
+    public static final int ISBN = 3;
+    public static final int PHONE = 4;
+    public static final int PRODUCT = 5;
+    public static final int SMS = 6;
+    public static final int TEXT = 7;
+    public static final int URL = 8;
+    public static final int WIFI = 9;
+    public static final int GEO = 10;
+    public static final int CALENDAR_EVENT = 11;
+    public static final int DRIVER_LICENSE = 12;
+
     @SafeParceled(1)
     private final int versionCode = 1;
+    // TODO: Check bit field here
     @SafeParceled(2)
     public int format;
     @SafeParceled(3)
@@ -37,7 +63,75 @@ public class Barcode extends AutoSafeParcelable {
     @SafeParceled(15)
     public Barcode.DriverLicense driverLicense;
 
-    public static Creator<Barcode> CREATOR = new AutoCreator<Barcode>(Barcode.class);
+    public Barcode() {}
+
+    public Barcode(String rawValue) {
+        // TODO: Fill these out.
+        this.cornerPoints = new Point[4];
+        this.rawValue = rawValue;
+        // TODO: Maybe URLDecoder.decode() or smth?
+        this.displayValue = rawValue;
+        detectAndSetType();
+    }
+
+    protected static String extractMatch(String value, Pattern pattern, int group) {
+        Matcher match = pattern.matcher(value);
+        if (!match.matches() || match.group(group) == null) {
+            return null;
+        }
+        return match.group(group);
+    }
+
+    protected static String extractMatch(String value, Pattern pattern) {
+        return extractMatch(value, pattern, 0);
+    }
+
+    private void detectAndSetType() {
+        // Formats mostly found here: https://github.com/codebude/QRCoder/wiki/Advanced-usage---Payload-generators
+        try {
+            URI uri = new URI(this.rawValue);
+            if (uri.getPath() == null) {
+                return;
+            }
+            switch(uri.getScheme().toLowerCase()) {
+                case "mailto":
+                    this.valueFormat = Barcode.EMAIL;
+                    this.email = Barcode.Email.parse(uri.getPath());
+                    break;
+                case "tel":
+                    this.valueFormat = Barcode.PHONE;
+                    this.phone = Barcode.Phone.parse(uri.getPath());
+                    break;
+                case "sms":
+                    this.valueFormat = Barcode.SMS;
+                    this.sms = Barcode.Sms.parse(uri.getPath());
+                    break;
+                case "mebkm":
+                    this.valueFormat = Barcode.URL;
+                    this.url = Barcode.UrlBookmark.parse(uri.getPath());
+                    break;
+                case "wifi":
+                    this.valueFormat = Barcode.WIFI;
+                    this.wifi = Barcode.WiFi.parse(uri.getPath());
+                    break;
+                case "geo":
+                    this.geoPoint = Barcode.GeoPoint.parse(uri.getPath());
+                    if (this.geoPoint != null) {
+                        this.valueFormat = Barcode.GEO;
+                    }
+                    break;
+                    // TODO: Contact information, calendar events, and driver license
+                default:
+                    Log.e(TAG, "Scheme " + uri.getScheme() + " is not supported yet");
+                    this.valueFormat = Barcode.TEXT;
+                    break;
+            }
+        } catch (URISyntaxException ex) {
+            this.valueFormat = Barcode.TEXT;
+        }
+    }
+
+    public static Creator<Barcode> CREATOR = new AutoCreator<>(Barcode.class);
 
     public static class Email extends AutoSafeParcelable {
         public static final int UNKNOWN = 0;
@@ -55,7 +149,17 @@ public class Barcode extends AutoSafeParcelable {
         @SafeParceled(5)
         public String body;
 
-        public static Creator<Email> CREATOR = new AutoCreator<Email>(Email.class);
+        public static Email parse(String value) {
+            Email result = new Email();
+            // TODO: Check the users contacts to see if we know the address?
+            result.type = UNKNOWN;
+            result.address = extractMatch(value, Patterns.EMAIL_ADDRESS);
+            result.subject = extractMatch(value, Pattern.compile("subject=(.*?)[$&]"));
+            result.body = extractMatch(value, Pattern.compile("body=(.*?)[$&]"));
+            return result;
+        }
+
+        public static Creator<Email> CREATOR = new AutoCreator<>(Email.class);
     }
 
     public static class Phone extends AutoSafeParcelable {
@@ -72,7 +176,14 @@ public class Barcode extends AutoSafeParcelable {
         @SafeParceled(3)
         public String number;
 
-        public static Creator<Phone> CREATOR = new AutoCreator<Phone>(Phone.class);
+        public static Phone parse(String value) {
+            Phone phone = new Phone();
+            phone.type = UNKNOWN;
+            phone.number = value;
+            return phone;
+        }
+
+        public static Creator<Phone> CREATOR = new AutoCreator<>(Phone.class);
     }
 
     public static class Sms extends AutoSafeParcelable {
@@ -83,7 +194,14 @@ public class Barcode extends AutoSafeParcelable {
         @SafeParceled(3)
         public String phoneNumber;
 
-        public static Creator<Sms> CREATOR = new AutoCreator<Sms>(Sms.class);
+        public static Sms parse(String value) {
+            Sms result = new Sms();
+            result.phoneNumber = extractMatch(value, Pattern.compile("^(.*?)[?,]"));
+            result.message = extractMatch(value, Pattern.compile("body=(.*)$"));
+            return result;
+        }
+
+        public static Creator<Sms> CREATOR = new AutoCreator<>(Sms.class);
     }
 
     public static class WiFi extends AutoSafeParcelable {
@@ -100,7 +218,24 @@ public class Barcode extends AutoSafeParcelable {
         @SafeParceled(4)
         public int encryptionType;
 
-        public static Creator<WiFi> CREATOR = new AutoCreator<WiFi>(WiFi.class);
+        public static WiFi parse(String value) {
+            WiFi result = new WiFi();
+            result.password = extractMatch(value, Pattern.compile("(P|p):(.*?);"), 2);
+            result.ssid = extractMatch(value, Pattern.compile("(S|s):(.*?);"), 2);
+            result.encryptionType = OPEN;
+            String encryptionType = extractMatch(value, Pattern.compile("(T|t):(.*?);"), 2);
+            switch (encryptionType.toLowerCase()) {
+                case "wpa":
+                    result.encryptionType = WPA;
+                    break;
+                case "wep":
+                    result.encryptionType = WEP;
+                    break;
+            }
+            return result;
+        }
+
+        public static Creator<WiFi> CREATOR = new AutoCreator<>(WiFi.class);
     }
 
     public static class UrlBookmark extends AutoSafeParcelable {
@@ -111,7 +246,14 @@ public class Barcode extends AutoSafeParcelable {
         @SafeParceled(3)
         public String url;
 
-        public static Creator<UrlBookmark> CREATOR = new AutoCreator<UrlBookmark>(UrlBookmark.class);
+        public static UrlBookmark parse(String value) {
+            UrlBookmark result = new UrlBookmark();
+            result.title = extractMatch(value, Pattern.compile("(TITLE|title):(.*?);"), 2);
+            result.url = extractMatch(value, Pattern.compile("(URL|url):(.*?);"), 2);
+            return result;
+        }
+
+        public static Creator<UrlBookmark> CREATOR = new AutoCreator<>(UrlBookmark.class);
     }
 
     public static class GeoPoint extends AutoSafeParcelable {
@@ -122,7 +264,23 @@ public class Barcode extends AutoSafeParcelable {
         @SafeParceled(3)
         public double lng;
 
-        public static Creator<GeoPoint> CREATOR = new AutoCreator<GeoPoint>(GeoPoint.class);
+        public static GeoPoint parse(String value) {
+            GeoPoint result = new GeoPoint();
+            int commaIndex = value.indexOf(',');
+            // We need at least one number after the comma for longitude
+            if (commaIndex == -1 || value.length() <= commaIndex) {
+                return null;
+            }
+            try {
+                result.lat = Double.parseDouble(value.substring(0, commaIndex));
+                result.lng = Double.parseDouble(value.substring(commaIndex + 1));
+            } catch(NumberFormatException e) {
+                return null;
+            }
+            return result;
+        }
+
+        public static Creator<GeoPoint> CREATOR = new AutoCreator<>(GeoPoint.class);
     }
 
     public static class CalendarDateTime extends AutoSafeParcelable {
@@ -145,7 +303,7 @@ public class Barcode extends AutoSafeParcelable {
         @SafeParceled(9)
         public String rawValue;
 
-        public static Creator<CalendarDateTime> CREATOR = new AutoCreator<CalendarDateTime>(CalendarDateTime.class);
+        public static Creator<CalendarDateTime> CREATOR = new AutoCreator<>(CalendarDateTime.class);
     }
 
     public static class CalendarEvent extends AutoSafeParcelable {
@@ -166,7 +324,7 @@ public class Barcode extends AutoSafeParcelable {
         @SafeParceled(8)
         public Barcode.CalendarDateTime end;
 
-        public static Creator<CalendarEvent> CREATOR = new AutoCreator<CalendarEvent>(CalendarEvent.class);
+        public static Creator<CalendarEvent> CREATOR = new AutoCreator<>(CalendarEvent.class);
     }
 
     public static class PersonName extends AutoSafeParcelable {
@@ -187,7 +345,7 @@ public class Barcode extends AutoSafeParcelable {
         @SafeParceled(8)
         public String suffix;
 
-        public static Creator<PersonName> CREATOR = new AutoCreator<PersonName>(PersonName.class);
+        public static Creator<PersonName> CREATOR = new AutoCreator<>(PersonName.class);
     }
 
     public static class Address extends AutoSafeParcelable {
@@ -202,8 +360,62 @@ public class Barcode extends AutoSafeParcelable {
         @SafeParceled(3)
         public String[] addressLines;
 
-        public static Creator<Address> CREATOR = new AutoCreator<Address>(Address.class);
+        public static Creator<Address> CREATOR = new AutoCreator<>(Address.class);
     }
 
-    // TODO: DriverLicense and ContactInfo
+    public static class DriverLicense extends AutoSafeParcelable {
+        @SafeParceled(1)
+        final int versionCode = 1;
+        @SafeParceled(2)
+        public String documentType;
+        @SafeParceled(3)
+        public String firstName;
+        @SafeParceled(4)
+        public String middleName;
+        @SafeParceled(5)
+        public String lastName;
+        @SafeParceled(6)
+        public String gender;
+        @SafeParceled(7)
+        public String addressStreet;
+        @SafeParceled(8)
+        public String addressCity;
+        @SafeParceled(9)
+        public String addressState;
+        @SafeParceled(10)
+        public String addressZip;
+        @SafeParceled(11)
+        public String licenseNumber;
+        @SafeParceled(12)
+        public String issueDate;
+        @SafeParceled(13)
+        public String expiryDate;
+        @SafeParceled(14)
+        public String birthDate;
+        @SafeParceled(15)
+        public String issuingCountry;
+
+        public static Creator<DriverLicense> CREATOR = new AutoCreator<>(DriverLicense.class);
+    }
+
+    public static class ContactInfo extends AutoSafeParcelable {
+        @SafeParceled(1)
+        final int versionCode = 1;
+        @SafeParceled(2)
+        public Barcode.PersonName name;
+        @SafeParceled(3)
+        public String organization;
+        @SafeParceled(4)
+        public String title;
+        @SafeParceled(5)
+        public Barcode.Phone[] phones;
+        @SafeParceled(6)
+        public Barcode.Email[] emails;
+        @SafeParceled(7)
+        public String[] urls;
+        @SafeParceled(8)
+        public Barcode.Address[] addresses;
+
+        public static Creator<ContactInfo> CREATOR = new AutoCreator<>(ContactInfo.class);
+    }
 }
