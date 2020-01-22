@@ -1,17 +1,12 @@
 package com.google.android.gms.vision.barcode.internal.client;
 
 import android.graphics.Point;
-import android.support.annotation.IntRange;
-import android.support.annotation.RestrictTo;
 import android.util.Log;
 import android.util.Patterns;
 
 import org.microg.safeparcel.AutoSafeParcelable;
 import org.microg.safeparcel.SafeParceled;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URLDecoder;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -68,6 +63,7 @@ public class Barcode extends AutoSafeParcelable {
     public Barcode(String rawValue) {
         // TODO: Fill these out.
         this.cornerPoints = new Point[4];
+        this.valueFormat = TEXT;
         this.rawValue = rawValue;
         // TODO: Maybe URLDecoder.decode() or smth?
         this.displayValue = rawValue;
@@ -88,46 +84,46 @@ public class Barcode extends AutoSafeParcelable {
 
     private void detectAndSetType() {
         // Formats mostly found here: https://github.com/codebude/QRCoder/wiki/Advanced-usage---Payload-generators
-        try {
-            URI uri = new URI(this.rawValue);
-            if (uri.getPath() == null) {
-                return;
-            }
-            switch(uri.getScheme().toLowerCase()) {
-                case "mailto":
-                    this.valueFormat = Barcode.EMAIL;
-                    this.email = Barcode.Email.parse(uri.getPath());
-                    break;
-                case "tel":
-                    this.valueFormat = Barcode.PHONE;
-                    this.phone = Barcode.Phone.parse(uri.getPath());
-                    break;
-                case "sms":
-                    this.valueFormat = Barcode.SMS;
-                    this.sms = Barcode.Sms.parse(uri.getPath());
-                    break;
-                case "mebkm":
-                    this.valueFormat = Barcode.URL;
-                    this.url = Barcode.UrlBookmark.parse(uri.getPath());
-                    break;
-                case "wifi":
-                    this.valueFormat = Barcode.WIFI;
-                    this.wifi = Barcode.WiFi.parse(uri.getPath());
-                    break;
-                case "geo":
-                    this.geoPoint = Barcode.GeoPoint.parse(uri.getPath());
-                    if (this.geoPoint != null) {
-                        this.valueFormat = Barcode.GEO;
-                    }
-                    break;
-                    // TODO: Contact information, calendar events, and driver license
-                default:
-                    Log.e(TAG, "Scheme " + uri.getScheme() + " is not supported yet");
-                    this.valueFormat = Barcode.TEXT;
-                    break;
-            }
-        } catch (URISyntaxException ex) {
+        int schemeSeparatorIndex = this.rawValue.indexOf(":");
+        if (schemeSeparatorIndex == -1 || this.rawValue.length() == schemeSeparatorIndex + 1) {
             this.valueFormat = Barcode.TEXT;
+            return;
+        }
+        String scheme = this.rawValue.substring(0, schemeSeparatorIndex);
+        String rest = this.rawValue.substring(schemeSeparatorIndex + 1);
+        switch(scheme.toLowerCase()) {
+            case "mailto":
+                this.valueFormat = Barcode.EMAIL;
+                this.email = Barcode.Email.parse(rest);
+                break;
+            case "tel":
+                this.valueFormat = Barcode.PHONE;
+                this.phone = Barcode.Phone.parse(rest);
+                break;
+            case "sms":
+            case "smsto":
+                this.valueFormat = Barcode.SMS;
+                this.sms = Barcode.Sms.parse(rest);
+                break;
+            case "mebkm":
+                this.valueFormat = Barcode.URL;
+                this.url = Barcode.UrlBookmark.parse(rest);
+                break;
+            case "wifi":
+                this.valueFormat = Barcode.WIFI;
+                this.wifi = Barcode.WiFi.parse(rest);
+                break;
+            case "geo":
+                this.geoPoint = Barcode.GeoPoint.parse(rest);
+                if (this.geoPoint != null) {
+                    this.valueFormat = Barcode.GEO;
+                }
+                break;
+            default:
+                // TODO: Contact information, calendar events, and driver license
+                Log.d(TAG, "Scheme " + scheme + " is not supported yet");
+                this.valueFormat = Barcode.TEXT;
+                break;
         }
     }
 
@@ -153,9 +149,15 @@ public class Barcode extends AutoSafeParcelable {
             Email result = new Email();
             // TODO: Check the users contacts to see if we know the address?
             result.type = UNKNOWN;
-            result.address = extractMatch(value, Patterns.EMAIL_ADDRESS);
-            result.subject = extractMatch(value, Pattern.compile("subject=(.*?)[$&]"));
-            result.body = extractMatch(value, Pattern.compile("body=(.*?)[$&]"));
+
+            int index = value.indexOf('?');
+            if (index != -1) {
+                result.address = extractMatch(value.substring(0, index), Patterns.EMAIL_ADDRESS);
+            } else {
+                result.address = extractMatch(value, Patterns.EMAIL_ADDRESS);
+            }
+            result.subject = extractMatch(value, Pattern.compile(".*?subject=([^&]*).*"), 1);
+            result.body = extractMatch(value, Pattern.compile(".*?body=([^&]*).*"), 1);
             return result;
         }
 
@@ -196,8 +198,8 @@ public class Barcode extends AutoSafeParcelable {
 
         public static Sms parse(String value) {
             Sms result = new Sms();
-            result.phoneNumber = extractMatch(value, Pattern.compile("^(.*?)[?,]"));
-            result.message = extractMatch(value, Pattern.compile("body=(.*)$"));
+            result.phoneNumber = extractMatch(value, Pattern.compile("([+]?[0-9]+).*"), 1);
+            result.message = extractMatch(value, Pattern.compile(".*?(body=|:|,)(.*)$"), 2);
             return result;
         }
 
@@ -220,10 +222,10 @@ public class Barcode extends AutoSafeParcelable {
 
         public static WiFi parse(String value) {
             WiFi result = new WiFi();
-            result.password = extractMatch(value, Pattern.compile("(P|p):(.*?);"), 2);
-            result.ssid = extractMatch(value, Pattern.compile("(S|s):(.*?);"), 2);
+            result.password = extractMatch(value, Pattern.compile(".*?(P|p):(.*?);.*"), 2);
+            result.ssid = extractMatch(value, Pattern.compile(".*?(S|s):(.*?);.*"), 2);
             result.encryptionType = OPEN;
-            String encryptionType = extractMatch(value, Pattern.compile("(T|t):(.*?);"), 2);
+            String encryptionType = extractMatch(value, Pattern.compile(".*?(T|t):(.*?);.*"), 2);
             switch (encryptionType.toLowerCase()) {
                 case "wpa":
                     result.encryptionType = WPA;
@@ -263,6 +265,13 @@ public class Barcode extends AutoSafeParcelable {
         public double lat;
         @SafeParceled(3)
         public double lng;
+
+        public GeoPoint(double lat, double lng) {
+            this.lat = lat;
+            this.lng = lng;
+        }
+
+        public GeoPoint() {}
 
         public static GeoPoint parse(String value) {
             GeoPoint result = new GeoPoint();
