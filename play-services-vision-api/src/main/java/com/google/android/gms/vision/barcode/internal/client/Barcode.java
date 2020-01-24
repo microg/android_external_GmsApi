@@ -7,8 +7,10 @@ import android.util.Patterns;
 import org.microg.safeparcel.AutoSafeParcelable;
 import org.microg.safeparcel.SafeParceled;
 
+import java.net.MalformedURLException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.net.URL;
 
 public class Barcode extends AutoSafeParcelable {
     public static final String TAG = Barcode.class.getSimpleName();
@@ -70,20 +72,17 @@ public class Barcode extends AutoSafeParcelable {
         detectAndSetType();
     }
 
-    protected static String extractMatch(String value, Pattern pattern, int group) {
-        Matcher match = pattern.matcher(value);
-        if (!match.matches() || match.group(group) == null) {
-            return null;
-        }
-        return match.group(group);
-    }
-
-    protected static String extractMatch(String value, Pattern pattern) {
-        return extractMatch(value, pattern, 0);
-    }
-
+    // TODO: Not all types are handled yet, calendarEvent, contactInfo, and driverLicense are not supported yet.
     private void detectAndSetType() {
-        // Formats mostly found here: https://github.com/codebude/QRCoder/wiki/Advanced-usage---Payload-generators
+        try {
+            // We do this for the side effect when the URI is invalid
+            new URL(this.rawValue);
+            this.valueFormat = Barcode.URL;
+            this.url = new Barcode.UrlBookmark();
+            this.url.url = this.rawValue;
+            return;
+        } catch(MalformedURLException _ex) {}
+
         int schemeSeparatorIndex = this.rawValue.indexOf(":");
         if (schemeSeparatorIndex == -1 || this.rawValue.length() == schemeSeparatorIndex + 1) {
             this.valueFormat = Barcode.TEXT;
@@ -125,6 +124,19 @@ public class Barcode extends AutoSafeParcelable {
                 this.valueFormat = Barcode.TEXT;
                 break;
         }
+    }
+
+
+    private static String extractMatch(String value, Pattern pattern, int group) {
+        Matcher match = pattern.matcher(value);
+        if (!match.matches() || match.group(group) == null) {
+            return null;
+        }
+        return match.group(group);
+    }
+
+    private static String extractMatch(String value, Pattern pattern) {
+        return extractMatch(value, pattern, 0);
     }
 
     public static Creator<Barcode> CREATOR = new AutoCreator<>(Barcode.class);
@@ -250,8 +262,8 @@ public class Barcode extends AutoSafeParcelable {
 
         public static UrlBookmark parse(String value) {
             UrlBookmark result = new UrlBookmark();
-            result.title = extractMatch(value, Pattern.compile("(TITLE|title):(.*?);"), 2);
-            result.url = extractMatch(value, Pattern.compile("(URL|url):(.*?);"), 2);
+            result.title = extractMatch(value, Pattern.compile(".*?(TITLE|title):(.*?);.*"), 2);
+            result.url = extractMatch(value, Pattern.compile(".*?(URL|url):(.*?);.*"), 2);
             return result;
         }
 

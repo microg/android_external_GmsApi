@@ -116,6 +116,46 @@ public class BarcodeTypesTest {
         assertThat(barcode.wifi.password).isEqualTo("password");
         assertThat(barcode.wifi.ssid).isEqualTo("network");
 
-        // TOOD: More variations here
+        barcode = new Barcode("wifi:T:WEP;S:network;P:password;;");
+        assertThat(barcode.valueFormat).isEqualTo(Barcode.WIFI);
+        assertThat(barcode.wifi).isNotNull();
+        assertThat(barcode.wifi.encryptionType).isEqualTo(Barcode.WiFi.WEP);
+
+        barcode = new Barcode("wifi:T:nopass;S:network;P:password;;");
+        assertThat(barcode.valueFormat).isEqualTo(Barcode.WIFI);
+        assertThat(barcode.wifi).isNotNull();
+        assertThat(barcode.wifi.encryptionType).isEqualTo(Barcode.WiFi.OPEN);
+
+        barcode = new Barcode("wifi:T:dummy;S:network;P:password;;");
+        assertThat(barcode.valueFormat).isEqualTo(Barcode.WIFI);
+        assertThat(barcode.wifi).isNotNull();
+        assertThat(barcode.wifi.encryptionType).isEqualTo(Barcode.WiFi.OPEN);
+    }
+
+    @Test
+    public void bookmark() {
+        Barcode barcode = new Barcode("http://lel.se");
+        assertThat(barcode.valueFormat).isEqualTo(Barcode.URL);
+        assertThat(barcode.url).isNotNull();
+        assertThat(barcode.url.url).isEqualTo("http://lel.se");
+        assertThat(barcode.url.title).isNull();
+
+        barcode = new Barcode("mebkm:title:hello;url:http://lel.se;;");
+        assertThat(barcode.valueFormat).isEqualTo(Barcode.URL);
+        assertThat(barcode.url).isNotNull();
+        assertThat(barcode.url.url).isEqualTo("http://lel.se");
+        assertThat(barcode.url.title).isEqualTo("hello");
+
+        barcode = new Barcode("mebkm:title:hello;url:http://lel.se;");
+        assertThat(barcode.valueFormat).isEqualTo(Barcode.URL);
+        assertThat(barcode.url).isNotNull();
+        assertThat(barcode.url.url).isEqualTo("http://lel.se");
+        assertThat(barcode.url.title).isEqualTo("hello");
+
+        barcode = new Barcode("mebkm:url:http://lel.se;");
+        assertThat(barcode.valueFormat).isEqualTo(Barcode.URL);
+        assertThat(barcode.url).isNotNull();
+        assertThat(barcode.url.url).isEqualTo("http://lel.se");
+        assertThat(barcode.url.title).isNull();
     }
 }
