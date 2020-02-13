@@ -119,7 +119,6 @@ public class Barcode extends AutoSafeParcelable {
                 }
                 break;
             default:
-                // TODO: Contact information, calendar events, and driver license
                 Log.d(TAG, "Scheme " + scheme + " is not supported yet");
                 this.valueFormat = Barcode.TEXT;
                 break;

@@ -56,6 +56,11 @@ public class BarcodeDetector extends INativeBarcodeDetector.Stub {
     }
 
     @Override
+    public void unk0(IObjectWrapper byteBuffer, FrameMetadata metadata) throws RemoteException {
+        Log.i(TAG, "Unkown method 0 called");
+    }
+
+    @Override
     public Barcode[] detect(IObjectWrapper wrappedBitmap, FrameMetadata metadata) throws RemoteException {
         Bitmap bitmap = ObjectWrapper.unwrapTyped(wrappedBitmap, Bitmap.class);
         if (bitmap == null) {
