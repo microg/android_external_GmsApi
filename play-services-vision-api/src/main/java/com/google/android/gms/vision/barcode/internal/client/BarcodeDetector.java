@@ -1,6 +1,7 @@
 package com.google.android.gms.vision.barcode.internal.client;
 
 import android.graphics.Bitmap;
+import android.graphics.Point;
 import android.os.RemoteException;
 import android.util.Log;
 
@@ -17,6 +18,7 @@ import com.google.zxing.FormatException;
 import com.google.zxing.NotFoundException;
 import com.google.zxing.Reader;
 import com.google.zxing.Result;
+import com.google.zxing.ResultPoint;
 import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.datamatrix.DataMatrixReader;
 import com.google.zxing.oned.CodaBarReader;
@@ -64,7 +66,7 @@ public class BarcodeDetector extends INativeBarcodeDetector.Stub {
     public Barcode[] detect(IObjectWrapper wrappedBitmap, FrameMetadata metadata) throws RemoteException {
         Bitmap bitmap = ObjectWrapper.unwrapTyped(wrappedBitmap, Bitmap.class);
         if (bitmap == null) {
-            Log.e("barcoder", "Could not unwrap Bitmap");
+            Log.e(TAG, "Could not unwrap Bitmap");
             return null;
         }
 
@@ -119,17 +121,21 @@ public class BarcodeDetector extends INativeBarcodeDetector.Stub {
 
     @Override
     public void unk2(IObjectWrapper unk1, FrameMetadata metadata) throws RemoteException {
-        Log.d("barcoder", "Unknown 2 called");
+        Log.d(TAG, "Unknown 2 called");
     }
 
     private void tryDetect(Reader reader, BinaryBitmap bitmap, List<Barcode> results) {
         try {
             Result result = reader.decode(bitmap);
             if (result.getText() != null) {
-                results.add(new Barcode(result.getText()));
+                // Try to fill in the corner information, not sure that this is correct.
+                List<Point> corners = new ArrayList<>();
+                for (ResultPoint point : result.getResultPoints()) {
+                    corners.add(new Point((int)point.getX(), (int)point.getY()));
+                }
+                results.add(new Barcode(result.getText(), corners.toArray(new Point[]{})));
             }
         } catch (FormatException e) {
-            // TODO: Log this in some other way?
             e.printStackTrace();
         } catch (ChecksumException e) {
             e.printStackTrace();

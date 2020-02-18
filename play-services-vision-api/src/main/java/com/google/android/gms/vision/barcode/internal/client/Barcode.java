@@ -12,6 +12,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.net.URL;
 
+/**
+ * Represents a barcode that can be detected by the com.google.android.gms.vision.barcode and
+ * com.google.firebase.ml.vision.barcode packages.
+ *
+ * Not all types are supported yet.
+ */
 public class Barcode extends AutoSafeParcelable {
     public static final String TAG = Barcode.class.getSimpleName();
 
@@ -30,7 +36,6 @@ public class Barcode extends AutoSafeParcelable {
 
     @SafeParceled(1)
     private final int versionCode = 1;
-    // TODO: Check bit field here
     @SafeParceled(2)
     public int format;
     @SafeParceled(3)
@@ -63,13 +68,15 @@ public class Barcode extends AutoSafeParcelable {
     public Barcode() {}
 
     public Barcode(String rawValue) {
-        // TODO: Fill these out.
-        this.cornerPoints = new Point[4];
         this.valueFormat = TEXT;
         this.rawValue = rawValue;
-        // TODO: Maybe URLDecoder.decode() or smth?
         this.displayValue = rawValue;
         detectAndSetType();
+    }
+
+    public Barcode(String rawValue, Point[] points) {
+        this(rawValue);
+        this.cornerPoints = points;
     }
 
     // TODO: Not all types are handled yet, calendarEvent, contactInfo, and driverLicense are not supported yet.
@@ -158,7 +165,6 @@ public class Barcode extends AutoSafeParcelable {
 
         public static Email parse(String value) {
             Email result = new Email();
-            // TODO: Check the users contacts to see if we know the address?
             result.type = UNKNOWN;
 
             int index = value.indexOf('?');
